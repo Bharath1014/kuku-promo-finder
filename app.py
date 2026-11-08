@@ -31,6 +31,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
+from promo_finder import ui
 from promo_finder.llm import KEY_ENV, Ctx, LLMError, detect_provider
 from promo_finder.parser import load_show
 from promo_finder.pipeline import run
@@ -39,6 +40,7 @@ from run import load_dotenv
 
 st.set_page_config(page_title="Promo Finder", page_icon="🎬", layout="wide")
 load_dotenv(Path(__file__).parent / ".env")  # local runs: reuse keys in .env
+st.markdown(ui.CSS, unsafe_allow_html=True)
 
 # provider -> (display name, default model(s))
 PROVIDERS = {
@@ -111,6 +113,7 @@ def where(p: dict) -> str:
 mem = st.session_state.setdefault("mem", {"api_key": "", "base_url": ""})
 model, provider, keys, using_owner = "heuristic", None, {}, False
 with st.sidebar:
+    st.markdown(ui.brand(), unsafe_allow_html=True)
     st.header("Settings")
     mode = st.radio("Engine", ["AI model", "Rules only (no API key)"], index=0)
     if mode == "AI model":
@@ -172,13 +175,7 @@ with st.sidebar:
     ep_range = st.text_input("Episode range (optional, e.g. 1-10)", "")
 
 # ---------------- main ----------------
-st.title("🎬 Promo Finder")
-st.write(
-    "Finds 20–60 s promo clips in a microdrama's screenplays. Each clip opens on a **hook** in the "
-    "first 3 seconds, ends on a **cliffhanger**, and makes sense to someone who has never seen the show. "
-    "The AI picks moments by screenplay block; code turns them into exact timestamps and enforces the "
-    "editing rules, so the model never invents a timestamp. Paste an API key from any AI provider in the "
-    "sidebar, or use rules only.")
+st.markdown(ui.hero(), unsafe_allow_html=True)
 
 with st.expander("Input format"):
     st.markdown(
@@ -191,7 +188,7 @@ files = st.file_uploader("Episode screenplays (.txt or .zip)", type=["txt", "zip
 demo_dir = os.environ.get("PROMO_DEMO_DIR", "")  # local testing only
 use_demo = bool(demo_dir) and st.checkbox(f"Use local folder: {Path(demo_dir).name}", value=not files)
 
-go = st.button("Find promos", type="primary", disabled=not (files or use_demo))
+go = st.button("▶  Find promos", type="primary", disabled=not (files or use_demo))
 
 if go:
     if mode == "AI model":
@@ -250,9 +247,14 @@ if go:
         shutil.rmtree(work, ignore_errors=True)  # nothing uploaded stays on the server
 
 result = st.session_state.get("result")
+if not result:
+    st.markdown(ui.empty("Upload a show's episode scripts and press Find promos. "
+                         "Your top promos will appear here, ranked like a Top Shows row."), unsafe_allow_html=True)
 if result:
     res = result["res"]
     promos = {p["id"]: p for p in res["promos"]}
+    st.markdown(ui.section(res.get("show", "Results"), f"{res['episodes']} episodes analysed"),
+                unsafe_allow_html=True)
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Promos found", len(res["promos"]))
     c2.metric("Episodes covered", len({s["episode"] for p in res["promos"] for s in p["segments"]}))
@@ -262,25 +264,16 @@ if result:
         used = sorted(set(res["models_used"].values()))
         st.caption("Model used: " + ", ".join(f"`{u}`" for u in used))
 
-    tab1, tab2, tab3 = st.tabs(["Post these first", "All promos", "Quality report"])
+    tab1, tab2, tab3 = st.tabs(["Top Promos", "All Promos", "Quality Report"])
     with tab1:
+        st.markdown(ui.section("Post these first", "ranked by an editor pass"), unsafe_allow_html=True)
         if res.get("ranking_notes"):
-            st.info(res["ranking_notes"])
+            st.markdown(ui.note(res["ranking_notes"]), unsafe_allow_html=True)
         for i, r in enumerate(res["ranking"], 1):
             p = promos[r["id"]]
-            with st.container(border=True):
-                st.markdown(f"**{i}. {p['title']}** · {where(p)} · {p['duration']} s")
-                a, b = st.columns(2)
-                a.markdown(f"**Hook:** {p['hook']}")
-                b.markdown(f"**Cliffhanger:** {p['cliffhanger']}")
-                st.markdown(f"**Why it works:** {p['why']}")
-                if r.get("reason") and r["reason"] != "score order":
-                    st.caption(f"Why this slot: {r['reason']}")
-                sc = p["scores"]
-                st.caption(f"Scores hook/cliffhanger/standalone: {sc.get('hook')}/{sc.get('cliffhanger')}/"
-                           f"{sc.get('standalone')}" + (f" · checks: {', '.join(p['flags'])}" if p["flags"] else ""))
-                with st.expander("Script of this clip"):
-                    st.text(p["transcript"])
+            st.markdown(ui.promo_card(i, p, r.get("reason", "")), unsafe_allow_html=True)
+            with st.expander("Script of this clip"):
+                st.text(p["transcript"])
     with tab2:
         df = pd.DataFrame([{
             "id": p["id"], "where": where(p), "sec": p["duration"], "hook": p["hook"],
@@ -290,9 +283,11 @@ if result:
     with tab3:
         st.markdown(re.sub(r"^(#+) ", lambda m: "#" * (len(m.group(1)) + 2) + " ", result["quality"], flags=re.M))
 
-    st.subheader("Download")
+    st.markdown(ui.section("Download", "for editors and reviewers"), unsafe_allow_html=True)
     d1, d2, d3 = st.columns(3)
     d1.download_button("promos.csv (for editors)", result["csv"], "promos.csv", "text/csv")
     d2.download_button("promos.md (ranked report)", result["md"], "promos.md", "text/markdown")
     d3.download_button("promos.json (everything)", json.dumps(res, indent=2, ensure_ascii=False).encode("utf-8"),
                        "promos.json", "application/json")
+
+st.markdown(ui.footer(), unsafe_allow_html=True)
