@@ -16,7 +16,7 @@ import re
 from pathlib import Path
 
 from . import heuristics as H
-from .llm import complete_json
+from .llm import Ctx, complete_json
 from .parser import Block, Episode, fmt, render
 
 PROPOSE_SYSTEM = """You are a senior promo editor for vertical microdrama apps (ReelShort, DramaBox).
@@ -254,7 +254,8 @@ Consider: stopping power of the first 3 seconds, how badly the ending makes peop
 Return JSON only."""
 
 
-def editor_rank(model: str, promos: list[dict], top: int, rpm: float, raw_dir: Path) -> list[dict]:
+def editor_rank(model: str, promos: list[dict], top: int, rpm: float, raw_dir: Path,
+                ctx: Ctx | None = None) -> list[dict]:
     lines = []
     for p in promos:
         segs = " + ".join(f"E{s['episode']} {s['start_ts']}-{s['end_ts']}" for s in p["segments"])
@@ -265,7 +266,7 @@ def editor_rank(model: str, promos: list[dict], top: int, rpm: float, raw_dir: P
               f"\n\nPick the {top} to post first, in posting order. Return JSON: "
               '{"ranking": [{"id": "P07", "reason": "one line: why this slot"}], '
               '"notes": "one or two lines on the overall strategy"}')
-    data, raw, _, used = complete_json(model, EDITOR_SYSTEM, prompt, rpm=rpm)
+    data, raw, _, used = complete_json(model, EDITOR_SYSTEM, prompt, rpm=rpm, ctx=ctx)
     (raw_dir / "editor_ranking.json").write_text(raw, encoding="utf-8")
     if isinstance(data, list):
         data = {"ranking": data}
@@ -275,7 +276,7 @@ def editor_rank(model: str, promos: list[dict], top: int, rpm: float, raw_dir: P
 
 def run(eps: list[Episode], show: str, model: str, out: Path, per_ep: int = 3,
         chunk: int = 5, top: int = 15, rpm: float = 8, log=print,
-        rank_model: str | None = None) -> dict:
+        rank_model: str | None = None, ctx: Ctx | None = None) -> dict:
     out.mkdir(parents=True, exist_ok=True)
     raw_dir = out / "raw_model_outputs"
     raw_dir.mkdir(exist_ok=True)
@@ -301,7 +302,7 @@ def run(eps: list[Episode], show: str, model: str, out: Path, per_ep: int = 3,
             prompt = _chunk_prompt(show, group, nxt, per_ep)
             name = f"episodes_{group[0].number:02d}-{group[-1].number:02d}"
             log(f"  model call: {name}")
-            data, raw, cached, used = complete_json(model, PROPOSE_SYSTEM, prompt, rpm=rpm)
+            data, raw, cached, used = complete_json(model, PROPOSE_SYSTEM, prompt, rpm=rpm, ctx=ctx)
             used_by[name] = used
             log(f"    -> {used}{' (cached)' if cached else ''}")
             (raw_dir / f"{name}.json").write_text(raw, encoding="utf-8")
@@ -325,7 +326,7 @@ def run(eps: list[Episode], show: str, model: str, out: Path, per_ep: int = 3,
     ranking, notes = [], ""
     if model != "heuristic" and kept:
         try:
-            ed = editor_rank(rank_model or model, kept[: max(top * 2, 20)], top, rpm, raw_dir)
+            ed = editor_rank(rank_model or model, kept[: max(top * 2, 20)], top, rpm, raw_dir, ctx=ctx)
             ids = {p["id"]: p for p in kept}
             for r in ed.get("ranking", []):
                 if r.get("id") in ids and r["id"] not in [x["id"] for x in ranking]:

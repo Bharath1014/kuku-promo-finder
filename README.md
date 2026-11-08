@@ -25,7 +25,22 @@ In the app you can:
 - browse the ranked promos, each with its clip script;
 - download the CSV, Markdown or JSON results.
 
-The app takes an API key from three places: the sidebar, `.env`, or Streamlit secrets (`GEMINI_API_KEY`). Uploaded files are used for that run only and are not stored.
+**API key: any provider.** The sidebar has a single **API key** field. Paste a key from OpenAI, Anthropic, Google Gemini, Groq, OpenRouter, or any other OpenAI-compatible API:
+- **Provider:** detected from the key. If the key's prefix doesn't identify it, the app asks each provider's free "list models" endpoint which one accepts it.
+- **Model:** filled in automatically, and you can change it, or override the provider and base URL, under "Provider, model and base URL".
+- **Privacy:** a visitor's key is kept only in their browser session. It is never written to disk or shared with other visitors.
+
+**Owner key (optional).** To let visitors run AI mode without a key of their own, add your key in the app's Streamlit secrets:
+
+```toml
+API_KEY = "your key from any provider"
+# optional:
+# MODEL = "gpt-5-mini"
+# PROVIDER = "openai"        # openai | anthropic | gemini | groq | openrouter | compat
+# API_BASE_URL = "https://api.example.com/v1"   # only for other OpenAI-compatible APIs
+```
+
+Uploaded files are deleted after each run. In AI mode, the script text is sent to the key's provider.
 
 ### Command-line outputs
 
