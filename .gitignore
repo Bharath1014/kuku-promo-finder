@@ -1,0 +1,12 @@
+.env
+.cache/
+__pycache__/
+input/
+*.txt
+!requirements.txt
+# outputs quote the confidential screenplays: shared privately, not in git
+outputs/
+*.zip
+# solution doc is submitted separately (quotes a few script lines)
+SOLUTION.md
+Solution.pdf
