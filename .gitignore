@@ -10,3 +10,4 @@ outputs/
 # solution doc is submitted separately (quotes a few script lines)
 SOLUTION.md
 Solution.pdf
+.streamlit/secrets.toml

@@ -13,6 +13,22 @@ python run.py --input "path/to/show folder" --model heuristic   # no API key nee
 
 Requires Python 3.10+. The input pack is not included: it is Kuku's confidential content.
 
+### Web app
+
+```bash
+streamlit run app.py
+```
+
+In the app you can:
+- upload a show's episode `.txt` files, or one `.zip` of the show folder;
+- choose an AI model or rules-only mode;
+- browse the ranked promos, each with its clip script;
+- download the CSV, Markdown or JSON results.
+
+The app takes an API key from three places: the sidebar, `.env`, or Streamlit secrets (`GEMINI_API_KEY`). Uploaded files are used for that run only and are not stored.
+
+### Command-line outputs
+
 Outputs go to `outputs/<model>/`:
 
 | File | What it is |
